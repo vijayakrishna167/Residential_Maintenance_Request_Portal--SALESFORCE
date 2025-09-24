@@ -1,0 +1,30 @@
+trigger MaintenanceRequestTrigger on Maintenance_Request__c (before insert) {
+    // Step 1: Create a list to hold the Property Unit IDs from the new requests
+    Set<Id> propertyUnitIds = new Set<Id>();
+
+    for (Maintenance_Request__c newRequest : Trigger.new) {
+        // Add each new request's Property Unit ID to our list
+        if (newRequest.Property_Unit__c != null) {
+            propertyUnitIds.add(newRequest.Property_Unit__c);
+        }
+    }
+
+    // Step 2: Find any existing OPEN maintenance requests for those same properties
+    List<Maintenance_Request__c> existingOpenRequests = [
+        SELECT Id, Property_Unit__c 
+        FROM Maintenance_Request__c 
+        WHERE Property_Unit__c IN :propertyUnitIds
+        AND Status__c != 'Completed'
+    ];
+
+    // Step 3: Loop through the new requests and check if a duplicate was found
+    for (Maintenance_Request__c newRequest : Trigger.new) {
+        for (Maintenance_Request__c existingRequest : existingOpenRequests) {
+            // If an existing open request has the same Property Unit, it's a duplicate
+            if (newRequest.Property_Unit__c == existingRequest.Property_Unit__c) {
+                // Add an error message to the new record to prevent it from saving
+                newRequest.addError('An open maintenance request already exists for this property unit.');
+            }
+        }
+    }
+}

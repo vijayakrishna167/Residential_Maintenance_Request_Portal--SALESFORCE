@@ -1,0 +1,39 @@
+@isTest
+private class MaintenanceRequestTriggerTest {
+    @isTest
+    static void testDuplicateRequestPrevention() {
+        // SETUP: Create a sample Property Unit record for our test
+        Property_Unit__c testProperty = new Property_Unit__c(Name = 'TEST-101');
+        insert testProperty;
+
+        // Create the FIRST maintenance request, which should succeed
+        Maintenance_Request__c firstRequest = new Maintenance_Request__c(
+            Property_Unit__c = testProperty.Id,
+            Issue_Description__c = 'First issue, sink is leaking.',
+            Status__c = 'New',
+            Priority__c = 'High'
+        );
+        insert firstRequest;
+
+        // ACTION: Start the test and try to create a SECOND (duplicate) request
+        Test.startTest();
+        
+        Maintenance_Request__c secondRequest = new Maintenance_Request__c(
+            Property_Unit__c = testProperty.Id, // Same property as the first request
+            Issue_Description__c = 'Second issue, sink is STILL leaking.',
+            Status__c = 'New',
+            Priority__c = 'High'
+        );
+
+        try {
+            // This insert should fail because our trigger will stop it
+            insert secondRequest;
+        } catch (DmlException e) {
+            // VERIFY: Check if the error message is the one we expect from our trigger
+            Boolean isCorrectError = e.getMessage().contains('An open maintenance request already exists');
+            System.assert(isCorrectError, 'The trigger did not stop the duplicate request as expected.');
+        }
+
+        Test.stopTest();
+    }
+}
